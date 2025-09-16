@@ -41,15 +41,13 @@ jobs:
       - name: Login to Azure Container Registry
         run: az acr login --name "$ACR_NAME"
 
-      - name: Inject Backend IPs into frontend/main.js
+      - name: Inject Backend URLs into frontend/main.js
         run: |
-          echo "Injecting IPs into frontend/main.js"
-          # OPTION 1: you have placeholders in the file
+          echo "Injecting URLs into frontend/main.js"
           if grep -q "_PRODUCT_API_URL_" frontend/main.js; then
             sed -i "s|_PRODUCT_API_URL_|${{ inputs.product_api_ip }}|g" frontend/main.js
             sed -i "s|_ORDER_API_URL_|${{ inputs.order_api_ip }}|g" frontend/main.js
           else
-            # OPTION 2: replace JS const lines directly (adjust names if your file differs)
             sed -i "s|^const PRODUCT_API *=.*|const PRODUCT_API = \"${{ inputs.product_api_ip }}\";|g" frontend/main.js
             sed -i "s|^const ORDER_API *=.*|const ORDER_API = \"${{ inputs.order_api_ip }}\";|g" frontend/main.js
           fi
@@ -65,12 +63,12 @@ jobs:
         uses: azure/aks-set-context@v3
         with:
           resource-group: ${{ inputs.aks_resource_group }}
-          cluster-name: ${{ inputs.aks_cluster_name }}
+          cluster-name:   ${{ inputs.aks_cluster_name }}
 
       - name: Deploy Frontend to AKS
         run: |
           cd k8s
-          # ensure this matches your actual manifest filename
+          # change the filename if yours differs
           kubectl apply -f frontend.yaml
 
       - name: Logout from Azure
