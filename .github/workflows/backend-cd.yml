@@ -37,7 +37,7 @@ jobs:
       - name: Set Kubernetes context (get AKS credentials)
         run: az aks get-credentials --resource-group "${{ github.event.inputs.aks_resource_group }}" --name "${{ github.event.inputs.aks_cluster_name }}" --overwrite-existing
 
-      - name: Attach ACR
+      - name: Attach ACR to AKS
         run: az aks update --name "${{ github.event.inputs.aks_cluster_name }}" --resource-group "${{ github.event.inputs.aks_resource_group }}" --attach-acr "${{ github.event.inputs.aks_acr_name }}"
 
       - name: Deploy Backend Infrastructure
@@ -60,8 +60,8 @@ jobs:
           SVC_PRODUCT="product-service"   # <-- change if your Service name differs
           SVC_ORDER="order-service"       # <-- change if your Service name differs
           for i in {1..60}; do
-            PRODUCT_IP=$(kubectl get svc $SVC_PRODUCT -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-            ORDER_IP=$(kubectl get svc $SVC_ORDER   -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            PRODUCT_IP=$(kubectl get svc "$SVC_PRODUCT" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            ORDER_IP=$(kubectl get  svc "$SVC_ORDER"   -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
             echo "Attempt $i/60 -> product=$PRODUCT_IP order=$ORDER_IP"
             if [[ -n "$PRODUCT_IP" && -n "$ORDER_IP" ]]; then
               echo "PRODUCT_IP=$PRODUCT_IP" >> $GITHUB_ENV
