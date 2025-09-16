@@ -1,82 +1,67 @@
-# week08/.github/workflows/frontend-cd.yml
-
 name: CD - Deploy Frontend to AKS
 
-# This workflow can be called by other workflows and takes inputs.
-# Or it can be run manually if you provide the IPs.
 on:
   workflow_dispatch:
     inputs:
       product_api_ip:
-        description: 'External IP of Product Service'
+        description: 'External URL of Product Service (e.g., http://X.X.X.X:8000)'
         required: true
         default: 'http://<ip_address>:8000'
       order_api_ip:
-        description: 'External IP of Order Service (e.g., http://Y.Y.Y.Y:8001)'
+        description: 'External URL of Order Service (e.g., http://Y.Y.Y.Y:8001)'
         required: true
         default: 'http://<ip_address>:8001'
       aks_cluster_name:
-        description: 'Name of the AKS Cluster to deploy to'
+        description: 'AKS Cluster name'
         required: true
-        default: '<aks_name>'
+        default: 'sit722sj46-aks'
       aks_resource_group:
-        description: 'Resource Group of the AKS Cluster'
+        description: 'AKS Resource Group'
         required: true
-        default: '<<resource_group_name>'
-
-  workflow_call:
-    inputs:
-      product_api_ip:
-        required: true
-        type: string
-      order_api_ip:
-        required: true
-        type: string
-      aks_cluster_name:
-        required: true
-        type: string
-      aks_resource_group:
-        required: true
-        type: string
+        default: 'sit722w08-sj46-rg'
 
 jobs:
   deploy_frontend:
     runs-on: ubuntu-latest
     environment: Production
 
+    env:
+      ACR_NAME: sit722sj46acr
+      ACR_LOGIN_SERVER: sit722sj46acr.azurecr.io
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Azure login using a Service Principal secret
       - name: Azure Login
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Login to Azure Container Registry (ACR)
       - name: Login to Azure Container Registry
-        run: az acr login --name ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+        run: az acr login --name "$ACR_NAME"
 
-      - name: Inject Backend IPs into Frontend main.js
+      - name: Inject Backend IPs into frontend/main.js
         run: |
-          echo "Injecting IPs into frontend/static/js/main.js"
-          # Ensure frontend/main.js is directly in the path for sed
-          sed -i "s|_PRODUCT_API_URL_|${{ inputs.product_api_ip }}|g" frontend/main.js
-          sed -i "s|_ORDER_API_URL_|${{ inputs.order_api_ip }}|g" frontend/main.js
-          
-          # Display the modified file content for debugging
-          echo "--- Modified main.js content ---"
-          cat frontend/main.js
-          echo "---------------------------------"
+          echo "Injecting IPs into frontend/main.js"
+          # OPTION 1: you have placeholders in the file
+          if grep -q "_PRODUCT_API_URL_" frontend/main.js; then
+            sed -i "s|_PRODUCT_API_URL_|${{ inputs.product_api_ip }}|g" frontend/main.js
+            sed -i "s|_ORDER_API_URL_|${{ inputs.order_api_ip }}|g" frontend/main.js
+          else
+            # OPTION 2: replace JS const lines directly (adjust names if your file differs)
+            sed -i "s|^const PRODUCT_API *=.*|const PRODUCT_API = \"${{ inputs.product_api_ip }}\";|g" frontend/main.js
+            sed -i "s|^const ORDER_API *=.*|const ORDER_API = \"${{ inputs.order_api_ip }}\";|g" frontend/main.js
+          fi
+          echo "--- main.js (after) ---"
+          tail -n +1 frontend/main.js
 
-      # Build and Push Docker image for Frontend
       - name: Build and Push Frontend Image
         run: |
-          docker build -t ${{ secrets.AZURE_CONTAINER_REGISTRY }}/frontend:latest ./frontend/
-          docker push ${{ secrets.AZURE_CONTAINER_REGISTRY }}/frontend:latest
+          docker build -t "$ACR_LOGIN_SERVER/frontend:latest" ./frontend
+          docker push "$ACR_LOGIN_SERVER/frontend:latest"
 
-      - name: Set Kubernetes context (get AKS credentials)
+      - name: Set Kubernetes context
         uses: azure/aks-set-context@v3
         with:
           resource-group: ${{ inputs.aks_resource_group }}
@@ -84,10 +69,9 @@ jobs:
 
       - name: Deploy Frontend to AKS
         run: |
-          echo "Deploying frontend with latest tag to AKS cluster: ${{ inputs.aks_cluster_name }}"
-          cd k8s/
-          # Ensure frontend-service.yaml is configured with your ACR
+          cd k8s
+          # ensure this matches your actual manifest filename
           kubectl apply -f frontend.yaml
 
-      - name: Logout from Azure (AKS deployment)
+      - name: Logout from Azure
         run: az logout
