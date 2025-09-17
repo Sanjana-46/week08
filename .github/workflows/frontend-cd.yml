@@ -68,8 +68,7 @@ jobs:
       - name: Deploy Frontend to AKS
         run: |
           cd k8s
-          # change the filename if yours differs
-          kubectl apply -f frontend.yaml
+          kubectl apply -f frontend.yaml   # change filename if yours differs
 
       - name: Logout from Azure
         run: az logout
