@@ -85,6 +85,8 @@ jobs:
         run: pytest tests --maxfail=1 --disable-warnings -q
 
   build_and_push_images:
+    # <-- ONLY run image build/push after merge to main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: test_and_lint_backends
 
