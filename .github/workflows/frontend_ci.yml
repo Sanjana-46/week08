@@ -9,27 +9,23 @@ on:
   workflow_dispatch:
 
 env:
-  ACR_NAME: sit722sj46acr
-  ACR_LOGIN_SERVER: sit722sj46acr.azurecr.io
+  ACR_LOGIN_SERVER: sit722studentacr.azurecr.io
   IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}
 
 jobs:
   build_and_push_frontend:
-    # Run only on pushes to main (never on PRs)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v1
+      - name: Docker login to ACR
+        uses: docker/login-action@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: ACR login
-        run: az acr login --name ${{ env.ACR_NAME }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+          registry: sit722studentacr.azurecr.io
 
       - name: Build and Push Frontend Image
         run: |
@@ -37,7 +33,3 @@ jobs:
           docker tag  ${{ env.ACR_LOGIN_SERVER }}/frontend:${{ env.IMAGE_TAG }} ${{ env.ACR_LOGIN_SERVER }}/frontend:latest
           docker push ${{ env.ACR_LOGIN_SERVER }}/frontend:${{ env.IMAGE_TAG }}
           docker push ${{ env.ACR_LOGIN_SERVER }}/frontend:latest
-
-      - name: Azure Logout
-        if: always()
-        run: az logout
